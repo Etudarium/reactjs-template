@@ -1,40 +1,60 @@
-// Include Telegram UI styles first to allow our code override the package CSS.
-import '@telegram-apps/telegram-ui/dist/styles.css';
+import { useState } from "react";
+import ReactDOM from "react-dom/client";
+import "./index.css";
 
-import ReactDOM from 'react-dom/client';
-import { StrictMode } from 'react';
-import { retrieveLaunchParams } from '@telegram-apps/sdk-react';
+function App() {
+  const [input, setInput] = useState("");
+  const [response, setResponse] = useState("");
 
-import { Root } from '@/components/Root.tsx';
-import { EnvUnsupported } from '@/components/EnvUnsupported.tsx';
-import { init } from '@/init.ts';
+  const handleSend = async () => {
+    if (!input) return;
+    setResponse("⏳ Жду ответа от ИИ...");
 
-import './index.css';
-
-// Mock the environment in case, we are outside Telegram.
-import './mockEnv.ts';
-
-const root = ReactDOM.createRoot(document.getElementById('root')!);
-
-try {
-  const launchParams = retrieveLaunchParams();
-  const { tgWebAppPlatform: platform } = launchParams;
-  const debug = (launchParams.tgWebAppStartParam || '').includes('platformer_debug')
-    || import.meta.env.DEV;
-
-  // Configure all application dependencies.
-  await init({
-    debug,
-    eruda: debug && ['ios', 'android'].includes(platform),
-    mockForMacOS: platform === 'macos',
-  })
-    .then(() => {
-      root.render(
-        <StrictMode>
-          <Root/>
-        </StrictMode>,
-      );
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${import.meta.env.VITE_OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4",
+        messages: [
+          {
+            role: "system",
+            content:
+              "Ты заботливый и мягкий психолог. Помоги пользователю с поддержкой, без оценок и советов.",
+          },
+          {
+            role: "user",
+            content: input,
+          },
+        ],
+      }),
     });
-} catch (e) {
-  root.render(<EnvUnsupported/>);
+
+    const data = await res.json();
+    const reply = data.choices?.[0]?.message?.content || "Нет ответа";
+    setResponse(reply);
+  };
+
+  return (
+    <div className="App" style={{ padding: "1rem", fontFamily: "sans-serif" }}>
+      <h2>🧠 Психоассистент</h2>
+      <textarea
+        placeholder="Что тебя тревожит?"
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        rows={4}
+        style={{ width: "100%", fontSize: "16px" }}
+      />
+      <br />
+      <button onClick={handleSend} style={{ marginTop: "10px" }}>
+        Поговорить с ИИ
+      </button>
+      <p style={{ whiteSpace: "pre-wrap", marginTop: "1rem" }}>{response}</p>
+    </div>
+  );
 }
+
+const root = ReactDOM.createRoot(document.getElementById("root")!);
+root.render(<App />);
